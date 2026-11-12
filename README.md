@@ -150,3 +150,4 @@ The project includes an evaluation suite (`npm run test:cases`) verifying all 10
 ## 7. License
 
 MIT
+"# mandate" 
