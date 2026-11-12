@@ -5,8 +5,16 @@ export default function LedgerPage({ onNotify }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ summary: {}, rows: [] });
   const [filter, setFilter] = useState('ALL');
+  const [highlightTx, setHighlightTx] = useState(null);
 
   useEffect(() => {
+    // Check if PayPal redirected back with a captured transaction
+    const hash = window.location.hash || '';
+    const txMatch = hash.match(/captured=([^&]+)/);
+    if (txMatch) {
+      setHighlightTx(txMatch[1]);
+      if (onNotify) onNotify(`🎉 PayPal Sandbox Transaction Captured: ${txMatch[1]}`, 'success');
+    }
     fetchLedger();
   }, []);
 
@@ -164,9 +172,17 @@ export default function LedgerPage({ onNotify }) {
                     badge = 'bg-rose-500/10 text-rose-300 border-rose-500/30';
                   }
 
+                  const isJustCaptured = highlightTx && row.transaction_id === highlightTx;
+
                   return (
-                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                    <tr key={idx} className={`transition-colors ${isJustCaptured ? 'bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40' : 'hover:bg-slate-800/40'}`}>
                       <td className="py-4 px-5">
+                        {isJustCaptured && (
+                          <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                            <span>Just captured via PayPal Sandbox!</span>
+                          </div>
+                        )}
                         <div className="font-bold text-slate-100 text-sm">{row.name}</div>
                         <div className="text-[11px] text-slate-400 font-mono">
                           ID: {row.product_id} | Qty: {row.qty}
@@ -194,8 +210,11 @@ export default function LedgerPage({ onNotify }) {
 
                       <td className="py-4 px-4 font-mono text-[11px]">
                         {row.transaction_id ? (
-                          <div className="flex items-center space-x-1 text-blue-400 font-semibold">
-                            <span>{row.transaction_id}</span>
+                          <div className={`font-bold break-all ${isJustCaptured ? 'text-emerald-300' : 'text-blue-400'}`}>
+                            {row.transaction_id}
+                            {isJustCaptured && (
+                              <div className="text-[10px] text-emerald-500 font-normal mt-0.5">PayPal Sandbox Capture ID</div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-slate-600">—</span>

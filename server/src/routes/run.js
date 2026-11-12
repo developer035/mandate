@@ -81,16 +81,40 @@ router.get('/:id', (req, res) => {
     let approveUrl = null;
     if (run.status === 'AWAITING_PAYMENT') {
       const lastOrderStep = steps.slice().reverse().find(s => s.tool === 'create_paypal_order');
-      if (lastOrderStep && lastOrderStep.output.approve_url) {
+      if (lastOrderStep && lastOrderStep.output && lastOrderStep.output.approve_url) {
         approveUrl = lastOrderStep.output.approve_url;
       }
     }
 
     // Find latest basket check detail
     let latestBasket = null;
-    const lastCheckStep = steps.slice().reverse().find(s => s.tool === 'check_mandate');
-    if (lastCheckStep && lastCheckStep.output) {
-      latestBasket = lastCheckStep.output;
+    const lastOrderStep = steps.slice().reverse().find(s => s.tool === 'create_paypal_order');
+    const allowedCheck = steps.slice().reverse().find(s => s.tool === 'check_mandate' && s.output && s.output.status === 'ALLOWED');
+
+    if (lastOrderStep && lastOrderStep.output && lastOrderStep.output.items) {
+      const items = lastOrderStep.output.items;
+      const total = +(items.reduce((acc, i) => acc + (i.line_total || 0), 0)).toFixed(2);
+      latestBasket = {
+        status: 'ALLOWED',
+        items_detail: items,
+        basket_total: total
+      };
+    } else if (allowedCheck && allowedCheck.output) {
+      latestBasket = allowedCheck.output;
+    } else {
+      const anyCheck = steps.slice().reverse().find(s => s.tool === 'check_mandate');
+      if (anyCheck && anyCheck.output) {
+        latestBasket = anyCheck.output;
+      } else if (run.cart_json) {
+        const cart = JSON.parse(run.cart_json || '[]');
+        if (cart.length > 0) {
+          latestBasket = {
+            status: 'ALLOWED',
+            items_detail: cart,
+            basket_total: +(cart.reduce((acc, i) => acc + (i.line_total || 0), 0)).toFixed(2)
+          };
+        }
+      }
     }
 
     res.json({

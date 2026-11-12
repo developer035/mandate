@@ -54,8 +54,20 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Mandate Server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${PORT} is already in use by another process.`);
+      console.error(`👉 Run this command in your terminal to free port ${PORT}:`);
+      console.error(`   Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force`);
+      console.error(`👉 Or run: taskkill /F /IM node.exe\n`);
+      process.exit(1);
+    } else {
+      throw err;
+    }
   });
 }
 

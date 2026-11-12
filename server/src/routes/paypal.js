@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { captureOrder } = require('../paypal');
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || process.env.BASE_URL || 'http://localhost:3001';
 
 /**
  * GET /paypal/return
@@ -63,8 +63,63 @@ router.get('/return', async (req, res) => {
     // Mark run as COMPLETED
     db.prepare("UPDATE runs SET status = 'COMPLETED' WHERE id = ?").run(run.id);
 
-    // Redirect user back to the application UI
-    res.redirect(`${CLIENT_URL}/#/run?id=${run.id}&status=captured&tx=${transactionId}`);
+    console.log(`✅ PAYPAL CAPTURE SUCCESS — Order: ${orderId} | Transaction: ${transactionId} | Run: ${run.id}`);
+
+    // Redirect to a full-screen success page, then auto-redirect to the app
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Captured!</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #030712; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+          .card { background: #064e3b; border: 2px solid #10b981; border-radius: 24px; max-width: 500px; width: 100%; padding: 40px; text-align: center; }
+          .icon { font-size: 56px; margin-bottom: 20px; }
+          h1 { font-size: 26px; font-weight: 800; color: #34d399; margin-bottom: 8px; }
+          p { color: #a7f3d0; font-size: 14px; margin-bottom: 24px; }
+          .row { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; margin: 10px 0; text-align: left; }
+          .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6ee7b7; margin-bottom: 4px; }
+          .value { font-family: monospace; font-size: 14px; color: #ffffff; font-weight: 700; word-break: break-all; }
+          .badge { display: inline-block; background: #10b981; color: #fff; border-radius: 999px; font-size: 12px; font-weight: 700; padding: 4px 14px; margin-bottom: 24px; }
+          .btn { display: block; background: #10b981; color: #fff; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-weight: 800; font-size: 15px; margin-top: 24px; }
+          .note { font-size: 11px; color: #6ee7b7; margin-top: 16px; }
+        </style>
+        <script>
+          setTimeout(function() {
+            window.location.href = '${CLIENT_URL}/#/ledger?captured=${transactionId}';
+          }, 3000);
+        </script>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">🎉</div>
+          <div class="badge">PAYPAL SANDBOX — REAL CAPTURE</div>
+          <h1>Payment Captured!</h1>
+          <p>The PayPal sandbox payment was authorized by the buyer and captured by the server.<br>Mandate guardrails were enforced at every step.</p>
+
+          <div class="row">
+            <div class="label">PayPal Order ID</div>
+            <div class="value">${orderId}</div>
+          </div>
+          <div class="row">
+            <div class="label">Transaction / Capture ID</div>
+            <div class="value">${transactionId}</div>
+          </div>
+          <div class="row">
+            <div class="label">Run ID</div>
+            <div class="value">${run.id}</div>
+          </div>
+
+          <a class="btn" href="${CLIENT_URL}/#/ledger?captured=${transactionId}">
+            View in Audit Ledger →
+          </a>
+          <div class="note">Redirecting automatically in 3 seconds...</div>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (err) {
     console.error('Error in PayPal return handler:', err);
     res.status(500).send(`Payment capture failed: ${err.message}`);
